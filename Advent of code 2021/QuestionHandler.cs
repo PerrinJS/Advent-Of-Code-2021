@@ -1,14 +1,116 @@
 ﻿using System;
 using System.Diagnostics;
 
-namespace Advent_of_code_2021
+namespace QuestionHandler
 {
-    public abstract class QuestionHandler<T>
+    public abstract class QuestionHandler
     {
-        public abstract T process(string[] toProcess);
+        public abstract string process(string[] toProcess);
     }
 
-    public class Day1Q1Handler: QuestionHandler<int>
+    public static class QuestionHandlerFactory
+    {
+        /* TODO: At some point we should factor out the non factory related code */
+        struct HandlerMapElement
+        {
+            public readonly string name;
+            public readonly int day;
+            public readonly int part;
+            public readonly Func<QuestionHandler> create;
+
+            public HandlerMapElement(string name, int day, int part, Func<QuestionHandler> create)
+            {
+                this.name = name;
+                this.day = day;
+                this.part = part;
+                this.create = create;
+            }
+        }
+
+        private static readonly HandlerMapElement[] HANDLER_MAPPINGS =
+        {
+           new HandlerMapElement("Sonar Sweep", 1, 1, delegate{return new Day1Q1Handler();}),
+           new HandlerMapElement("Sonar Sweep", 1, 2, delegate{return new Day1Q2Handler();}),
+
+           new HandlerMapElement("Dive!", 1, 1, delegate{return new Day2Q1Handler();}),
+        };
+        private static int mapDay(int day)
+        {
+             return (int)Math.Ceiling(((double)day) / 2.0);
+        }
+
+        private static HandlerMapElement? getElement(int day, int part)
+        {
+            if(part > 2)
+            {
+                throw new IndexOutOfRangeException("There are only two parts to every question");
+            }
+            else
+            {
+                int index = mapDay(day);
+                index--;
+                index += part;
+                index--;
+
+
+                if(index > HANDLER_MAPPINGS.Length)
+                {
+                    return null;
+                }
+                else
+                {
+                    return HANDLER_MAPPINGS[index];
+                }
+            }
+        }
+
+        public static QuestionHandler getNew(int day, int part)
+        {
+            HandlerMapElement? match = getElement(day, part);
+
+            if(match == null)
+            {
+                return null;
+            }
+            else
+            {
+                return ((HandlerMapElement)match).create();
+            }
+        }
+
+        public static string getName(int day, int part)
+        {
+            HandlerMapElement? match = getElement(day, part);
+
+            if(match == null)
+            {
+                return null;
+            }
+            else
+            {
+                return ((HandlerMapElement)match).name;
+            }
+        }
+
+        public static int getDayCount()
+        {
+            return mapDay(HANDLER_MAPPINGS.Length);
+        }
+
+        public static int getPartCount(int day)
+        {
+            //FIXME: make this return the #parts for the guiven day
+            //The total length minus how many total days we have
+            int remainder = mapDay(HANDLER_MAPPINGS.Length) * 2 - HANDLER_MAPPINGS.Length;
+            if (remainder == 0)
+                return 2;
+            else
+                return 1;
+        }
+    }
+
+
+    public class Day1Q1Handler: QuestionHandler
     {
         /* Thease functions would work if the question input didn't have 2000 lines of input
         private int countLargerThanMesRec(string[] toProcess, int currPos, int prevVal, bool firstRun, int currLargerThenCount)
@@ -41,32 +143,35 @@ namespace Advent_of_code_2021
             return countLargerThanMesRec(toProcess, 0, 0, true, 0);
         }*/
 
-        public override int process(string[] toProcess)
+        public override string process(string[] toProcess)
         {
             int ret = 0, prevVal = 0;
             bool firstRun = true;
-            foreach(string s in toProcess)
+            if (toProcess.Length > 0)
             {
-                int currVal = Int32.Parse(s);
-                if (!firstRun)
+                foreach (string s in toProcess)
                 {
-                    if (prevVal < currVal)
+                    int currVal = Int32.Parse(s);
+                    if (!firstRun)
                     {
-                        ret++;
+                        if (prevVal < currVal)
+                        {
+                            ret++;
+                        }
                     }
-                }
-                else
-                {
-                    firstRun = false;
-                }
+                    else
+                    {
+                        firstRun = false;
+                    }
 
-                prevVal = currVal;
+                    prevVal = currVal;
+                }
             }
-            return ret;
+            return ret.ToString();
         }
     }
 
-    public class Day1Q2Handler: QuestionHandler<int>
+    public class Day1Q2Handler: QuestionHandler
     {
         private class ProcessingState
         {
@@ -225,14 +330,25 @@ namespace Advent_of_code_2021
                 numPorcessed++;
             }
         }
-        public override int process(string[] toProcess)
+        public override string process(string[] toProcess)
         {
             ProcessingState state = new ProcessingState();
-            foreach(string s in toProcess)
+            if (toProcess.Length > 0)
             {
-                state.nextIn(Int32.Parse(s));
+                foreach (string s in toProcess)
+                {
+                    state.nextIn(Int32.Parse(s));
+                }
             }
-            return state.getTotalIncreced();
+            return state.getTotalIncreced().ToString();
+        }
+    }
+
+    public class Day2Q1Handler: QuestionHandler
+    {
+        public override string process(string[] toProcess)
+        {
+            return "";
         }
     }
 }
