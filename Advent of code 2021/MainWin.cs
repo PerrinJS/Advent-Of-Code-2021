@@ -114,9 +114,13 @@ namespace Advent_of_code_2021
                         this.questionOutputTextBox.Text =
                             handler.process(processedQuestionInput);
                     }
-                    catch (Exception except)
+                    catch (QuestionHandler.BadInputException badInput)
                     {
-                        this.badInputUserNotification(except);
+                        this.badInputUserNotification(badInput);
+                    }
+                    catch (Exception error)
+                    {
+                        this.processingErrorNotification(error);
                     }
                 }
             }
@@ -130,7 +134,7 @@ namespace Advent_of_code_2021
             if(partCount > 0)
                 parts = numSelectionArayFromInt(1, partCount);
 
-            Debug.Assert(!(parts == null));
+            Debug.Assert(parts != null);
 
             //Clear out the previous contense
             int end = this.partSelectComboBox.Items.Count;
@@ -143,9 +147,14 @@ namespace Advent_of_code_2021
             this.partSelectComboBox.Items.AddRange(parts);
         }
 
-        private void badInputUserNotification(Exception e)
+        private void badInputUserNotification(QuestionHandler.BadInputException e)
         {
-            MessageBox.Show("Processing failed with the following message:\n" + e.Message,
+            MessageBox.Show("The question input was invalid:\n" + e.Message,
+                "Processing failed", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        private void processingErrorNotification(Exception e)
+        {
+            MessageBox.Show("Processing failed with the following message:\n" + e.Message + "\n" + e.GetType(),
                 "Processing failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }

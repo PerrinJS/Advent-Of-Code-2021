@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace QuestionHandler
@@ -36,6 +37,7 @@ namespace QuestionHandler
            new HandlerMapElement("Dive!", 2, 2, delegate{return new Day2Q2Handler();}),
 
            //Today
+           new HandlerMapElement("Binary Diagnostic", 3, 1, delegate{return new Day3Q1Handler();}),
         };
 
         //TODO: reimplement a mathmatical mapping for this
@@ -116,6 +118,15 @@ namespace QuestionHandler
         }
     }
 
+    public class BadInputException: Exception
+    {
+        public BadInputException(string message): base(message) {}
+        public BadInputException(string message, Exception innerException): base(message, innerException) {}
+    }
+
+    /* QUESTION HANDLERS */
+    /* Each of the question handlers are written as self contained answers
+     * hence the lack of code reuse between them */
 
     public class Day1Q1Handler: QuestionHandler
     {
@@ -480,4 +491,175 @@ namespace QuestionHandler
             return (this.depth * this.xPos).ToString();
         }
     }
+
+    public class Day3Q1Handler : QuestionHandler
+    {
+        private class PowerConsumption
+        {
+            int[] input;
+            uint bitWidth;
+            bool[] gamma;
+            bool[] epsilon;
+
+            public PowerConsumption(int[] input, uint bitWidth)
+            {
+                if((input == null) || (input.Length == 0))
+                {
+                    string errorMsg;
+                    if(input == null)
+                    {
+                        errorMsg = "Input cannot be null";
+                    }
+                    else
+                    {
+                        errorMsg = "Input cannot be empty";
+                    }
+                    throw new BadInputException(errorMsg);
+                }
+
+                if(bitWidth < 1)
+                {
+                    throw new BadInputException("Bit width cannot be zero or negative");
+                }
+
+                this.input = input;
+                this.bitWidth = bitWidth;
+                this.gamma = null;
+                this.epsilon = null;
+            }
+
+            private static bool intToBool(int x)
+            {
+                return x != 0 ? true : false;
+            }
+
+            private static int boolToInt(bool x)
+            {
+                return x ? 1 : 0;
+            }
+
+            private static int boolArrToIntRev(List<bool> toConvert, int prev = 0)
+            {
+                if((toConvert == null) || (toConvert.Count == 0))
+                {
+                    return prev;
+                }
+                else
+                {
+                    var curr = boolToInt(toConvert[toConvert.Count - 1]);
+                    toConvert.RemoveAt(toConvert.Count - 1);
+                    prev = (prev << 1) + curr;
+                    return boolArrToIntRev(toConvert, prev);
+                }
+            }
+
+            private int boolArrToInt(List<bool> toConvert)
+            {
+                int unrevBitStr = 0;
+                for(int i = 0; i < this.bitWidth; i++)
+                {
+                    unrevBitStr = (unrevBitStr << 1) + 1;
+                }
+                return boolArrToIntRev(toConvert);
+            }
+
+            private static int greatestPosBit(int i)
+            {
+                var count = 0;
+                while(i > 0)
+                {
+                    i = i >> 1;
+                    count++;
+                }
+                return count;
+            }
+
+            //TODO: rename
+            private bool[] siftBits(Func<int[], int, bool> bitTotalOp)
+            {
+                var ret = new bool[bitWidth];
+
+                var totalPosBits = new int[bitWidth];
+                foreach(var powerVal in input)
+                {
+                    for(int i = 0;  i < bitWidth; i++)
+                    {
+                        //extract that bit and add it to the total for that position
+                        int currBit = (int)((1 << i) & powerVal) >> (int)i;
+                        totalPosBits[i] += currBit;
+                    }
+                }
+
+                for(int i = 0; i < totalPosBits.Length; i++)
+                {
+                    var mostCommonBit = bitTotalOp(totalPosBits, i);
+                    ret[i] = mostCommonBit;
+                }
+
+                return ret;
+            }
+
+
+            private void updateGamma()
+            {
+                this.gamma = siftBits((int[] totalPosBits, int pos) => ((float)totalPosBits[pos] >= ((float)this.input.Length) / 2.0));
+            }
+            private void updateEpsilon()
+            {
+                this.epsilon = siftBits((int[] totalPosBits, int pos) => ((float)totalPosBits[pos] <= ((float)this.input.Length) / 2.0));
+            }
+
+            public int getGammaRateInt()
+            {
+                if(this.gamma == null)
+                {
+                    updateGamma();
+                }
+
+                return boolArrToInt(new List<bool>(this.gamma));
+            }
+
+            public int getEpsilonRateInt()
+            {
+                if(this.epsilon == null)
+                {
+                    updateEpsilon();
+                }
+
+                return boolArrToInt(new List<bool>(this.epsilon));
+            }
+        }
+
+        private int strBinToInt(string toConvert)
+        {
+            var inputChars = toConvert.ToCharArray();
+            int output = 0;
+            foreach(var ch in inputChars)
+            {
+                if((ch != '1') && (ch != '0'))
+                {
+                    throw new BadInputException("Can only take binary input, i.e '0's and or '1's in the string");
+                }
+                output = output << 1;
+                output += (ch == '0') ? 0 : 1;
+            }
+            return output;
+        }
+
+        public override string process(string[] toProcess)
+        {
+            var convertedInput = new int[toProcess.Length];
+            for(int i = 0; i < toProcess.Length; i++)
+            {
+                convertedInput[i] = strBinToInt(toProcess[i]);
+            }
+
+            var batteryLevel = new PowerConsumption(convertedInput, (uint)toProcess[0].Length);
+            var gammaRate = batteryLevel.getGammaRateInt();
+            var epsilonRate = batteryLevel.getEpsilonRateInt();
+            return (gammaRate * epsilonRate).ToString();
+        }
+    }
+
+
 }
