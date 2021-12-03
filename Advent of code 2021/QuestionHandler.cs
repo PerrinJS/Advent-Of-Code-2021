@@ -538,7 +538,7 @@ namespace QuestionHandler
                 return x ? 1 : 0;
             }
 
-            private static int boolArrToIntRev(List<bool> toConvert, int prev = 0)
+            private static int boolArrToInt(List<bool> toConvert, int prev = 0)
             {
                 if((toConvert == null) || (toConvert.Count == 0))
                 {
@@ -549,18 +549,8 @@ namespace QuestionHandler
                     var curr = boolToInt(toConvert[toConvert.Count - 1]);
                     toConvert.RemoveAt(toConvert.Count - 1);
                     prev = (prev << 1) + curr;
-                    return boolArrToIntRev(toConvert, prev);
+                    return boolArrToInt(toConvert, prev);
                 }
-            }
-
-            private int boolArrToInt(List<bool> toConvert)
-            {
-                int unrevBitStr = 0;
-                for(int i = 0; i < this.bitWidth; i++)
-                {
-                    unrevBitStr = (unrevBitStr << 1) + 1;
-                }
-                return boolArrToIntRev(toConvert);
             }
 
             private static int greatestPosBit(int i)
@@ -660,6 +650,4 @@ namespace QuestionHandler
             return (gammaRate * epsilonRate).ToString();
         }
     }
-
-
 }
