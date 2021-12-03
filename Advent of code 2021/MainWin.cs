@@ -20,14 +20,21 @@ namespace Advent_of_code_2021
 
         private void MainWin_Load(object sender, EventArgs e)
         {
-            int days;
-            object[] daysList, partsList;
+            int dayCount = 0, partCount = 0;
+            object[] daysList = null;
+            object[] partsList = null;
 
-            days = QuestionHandler.QuestionHandlerFactory.getDayCount();
-            daysList = numSelectionArayFromInt(1, days);
-            partsList = numSelectionArayFromInt(1, QuestionHandler.QuestionHandlerFactory.getPartCount(days));
+            dayCount = QuestionHandler.QuestionHandlerFactory.getDayCount() ?? 0;
+            if(dayCount > 0)
+            {
+                daysList = numSelectionArayFromInt(1, dayCount);
 
-            Debug.Assert(!((daysList == null) || (partsList == null)));
+                partCount = QuestionHandler.QuestionHandlerFactory.getPartCount(dayCount) ?? 0;
+                if(partCount > 0)
+                    partsList = numSelectionArayFromInt(1, partCount);
+            }
+
+            Debug.Assert((daysList != null) && (partsList != null));
 
             //Add all the options for the user to select
             this.daySelectComboBox.Items.AddRange(daysList);
@@ -95,11 +102,22 @@ namespace Advent_of_code_2021
                 QuestionHandler.QuestionHandler handler =
                     QuestionHandler.QuestionHandlerFactory.getNew(day, part);
 
+                /* This should never be null as the user inputs are generated from what is in the table.
+                 * hence they should be by deffinition consistent. */
+                Debug.Assert(handler != null);
+
                 questionInput.Trim();
                 processedQuestionInput = questionInput.Split(new[] { "\r\n" }, StringSplitOptions.None);
-                if((processedQuestionInput.Length <= 1) && (!processedQuestionInput[0].Equals(""))){
-                    this.questionOutputTextBox.Text =
-                        handler.process(processedQuestionInput);
+                if((processedQuestionInput.Length >= 1) && (!processedQuestionInput[0].Equals(""))){
+                    try
+                    {
+                        this.questionOutputTextBox.Text =
+                            handler.process(processedQuestionInput);
+                    }
+                    catch (Exception except)
+                    {
+                        this.badInputUserNotification(except);
+                    }
                 }
             }
         }
@@ -107,7 +125,10 @@ namespace Advent_of_code_2021
         private void daySelectComboBox_SelectedIndexChanged(object sender, EventArgs e)
         {
             ComboBox daySelect = (ComboBox)sender;
-            var parts = numSelectionArayFromInt(1, QuestionHandler.QuestionHandlerFactory.getPartCount(daySelect.SelectedIndex+1));
+            var partCount = QuestionHandler.QuestionHandlerFactory.getPartCount(daySelect.SelectedIndex + 1) ?? 0;
+            object[] parts = null;
+            if(partCount > 0)
+                parts = numSelectionArayFromInt(1, partCount);
 
             Debug.Assert(!(parts == null));
 
@@ -120,6 +141,12 @@ namespace Advent_of_code_2021
             }
 
             this.partSelectComboBox.Items.AddRange(parts);
+        }
+
+        private void badInputUserNotification(Exception e)
+        {
+            MessageBox.Show("Processing failed with the following message:\n" + e.Message,
+                "Processing failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 }

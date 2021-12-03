@@ -32,36 +32,34 @@ namespace QuestionHandler
            new HandlerMapElement("Sonar Sweep", 1, 1, delegate{return new Day1Q1Handler();}),
            new HandlerMapElement("Sonar Sweep", 1, 2, delegate{return new Day1Q2Handler();}),
 
-           new HandlerMapElement("Dive!", 1, 1, delegate{return new Day2Q1Handler();}),
-        };
-        private static int mapDay(int day)
-        {
-             return (int)Math.Ceiling(((double)day) / 2.0);
-        }
+           new HandlerMapElement("Dive!", 2, 1, delegate{return new Day2Q1Handler();}),
+           new HandlerMapElement("Dive!", 2, 2, delegate{return new Day2Q2Handler();}),
 
+           //Today
+        };
+
+        //TODO: reimplement a mathmatical mapping for this
         private static HandlerMapElement? getElement(int day, int part)
         {
+            HandlerMapElement? ret = null;
+
             if(part > 2)
             {
                 throw new IndexOutOfRangeException("There are only two parts to every question");
             }
             else
             {
-                int index = mapDay(day);
-                index--;
-                index += part;
-                index--;
-
-
-                if(index > HANDLER_MAPPINGS.Length)
+                foreach(var element in HANDLER_MAPPINGS)
                 {
-                    return null;
-                }
-                else
-                {
-                    return HANDLER_MAPPINGS[index];
+                    int eDay = element.day, ePart = element.part;
+                    if((eDay == day) && (ePart == part))
+                    {
+                        ret = element;
+                    }
                 }
             }
+
+            return ret;
         }
 
         public static QuestionHandler getNew(int day, int part)
@@ -92,20 +90,29 @@ namespace QuestionHandler
             }
         }
 
-        public static int getDayCount()
+        public static Int32? getDayCount()
         {
-            return mapDay(HANDLER_MAPPINGS.Length);
+            return HANDLER_MAPPINGS[HANDLER_MAPPINGS.Length-1].day;
         }
 
-        public static int getPartCount(int day)
+        public static Int32? getPartCount(int day)
         {
-            //FIXME: make this return the #parts for the guiven day
-            //The total length minus how many total days we have
-            int remainder = mapDay(HANDLER_MAPPINGS.Length) * 2 - HANDLER_MAPPINGS.Length;
-            if (remainder == 0)
-                return 2;
-            else
-                return 1;
+            //TODO: reimplement a mathmatical mapping for this
+            HandlerMapElement? lastGreatestPartOfDay = null;
+            foreach(var element in HANDLER_MAPPINGS)
+            {
+                if(element.day == day)
+                {
+                    lastGreatestPartOfDay = element;
+                }
+            }
+
+            Int32? ret = null;
+            if (lastGreatestPartOfDay.HasValue)
+            {
+                ret = lastGreatestPartOfDay.Value.part;
+            }
+            return ret;
         }
     }
 
