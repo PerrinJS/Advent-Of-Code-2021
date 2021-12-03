@@ -406,4 +406,71 @@ namespace QuestionHandler
         }
     }
 
+    public class Day2Q2Handler : QuestionHandler
+    {
+        public int depth;
+        public int xPos;
+        public int aim;
+
+        public Day2Q2Handler()
+        {
+            this.depth = 0;
+            this.xPos = 0;
+            this.aim = 0;
+        }
+
+        private void up(int inp)
+        {
+            this.aim -= inp;
+        }
+        private void down(int inp)
+        {
+            this.aim += inp;
+        }
+        private void forward(int inp)
+        {
+            this.xPos += inp;
+            this.depth += this.aim * inp;
+        }
+
+        public override string process(string[] toProcess)
+        {
+            foreach (var command in toProcess)
+            {
+                command.ToLower();
+                string[] cmdAndVal = command.Split();
+                if (cmdAndVal.Length == 2)
+                {
+                    switch (cmdAndVal[0])
+                    {
+                        case "up":
+                            {
+                                up(Int32.Parse(cmdAndVal[1]));
+                                break;
+                            }
+                        case "down":
+                            {
+                                down(Int32.Parse(cmdAndVal[1]));
+                                break;
+                            }
+                        case "forward":
+                            {
+                                forward(Int32.Parse(cmdAndVal[1]));
+                                break;
+                            }
+                    }
+                }
+                else if ((cmdAndVal.Length == 1) && (cmdAndVal[0].Equals("")))
+                {
+                    continue;
+                }
+                else
+                {
+                    throw new InvalidOperationException("The input string should contain only a command and value");
+                }
+            }
+
+            return (this.depth * this.xPos).ToString();
+        }
+    }
 }
