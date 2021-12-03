@@ -346,9 +346,64 @@ namespace QuestionHandler
 
     public class Day2Q1Handler: QuestionHandler
     {
+        struct Position
+        {
+            public int depth;
+            public int xPos;
+            public Position(int depth, int xPos)
+            {
+                this.depth = depth;
+                this.xPos = xPos;
+            }
+        }
         public override string process(string[] toProcess)
         {
-            return "";
+            var position = new Position(0, 0);
+            foreach(var command in toProcess)
+            {
+                command.ToLower();
+                string[] cmdAndVal = command.Split();
+                if(cmdAndVal.Length == 2)
+                {
+                    switch(cmdAndVal[0])
+                    {
+                        case "up":
+                            {
+                                var newVal = position.xPos - Int32.Parse(cmdAndVal[1]);
+                                if(newVal < 0)
+                                {
+                                    position.depth = 0;
+                                }
+                                else
+                                {
+                                    position.depth = position.depth - Int32.Parse(cmdAndVal[1]);
+                                }
+                                break;
+                            }
+                        case "down":
+                            {
+                                position.depth += Int32.Parse(cmdAndVal[1]);
+                                break;
+                            }
+                        case "forward":
+                            {
+                                position.xPos += Int32.Parse(cmdAndVal[1]);
+                                break;
+                            }
+                    }
+                }
+                else if((cmdAndVal.Length == 1) && (cmdAndVal[0].Equals("")))
+                {
+                    continue;
+                }
+                else
+                {
+                    throw new InvalidOperationException("The input string should contain only a command and value");
+                }
+            }
+
+            return (position.depth * position.xPos).ToString();
         }
     }
+
 }
