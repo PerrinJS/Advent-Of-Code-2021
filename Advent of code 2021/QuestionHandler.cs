@@ -36,8 +36,11 @@ namespace QuestionHandler
            new HandlerMapElement("Dive!", 2, 1, delegate{return new Day2Q1Handler();}),
            new HandlerMapElement("Dive!", 2, 2, delegate{return new Day2Q2Handler();}),
 
-           //Today
            new HandlerMapElement("Binary Diagnostic", 3, 1, delegate{return new Day3Q1Handler();}),
+           new HandlerMapElement("Binary Diagnostic", 3, 2, delegate{return new Day3Q2Handler();}),
+
+
+            
         };
 
         //TODO: reimplement a mathmatical mapping for this
@@ -569,21 +572,21 @@ namespace QuestionHandler
             {
                 var ret = new bool[bitWidth];
 
-                var totalPosBits = new int[bitWidth];
+                var totaledBits = new int[bitWidth];
                 foreach(var powerVal in input)
                 {
                     for(int i = 0;  i < bitWidth; i++)
                     {
                         //extract that bit and add it to the total for that position
                         int currBit = (int)((1 << i) & powerVal) >> (int)i;
-                        totalPosBits[i] += currBit;
+                        totaledBits[i] += currBit;
                     }
                 }
 
-                for(int i = 0; i < totalPosBits.Length; i++)
+                for(int i = 0; i < totaledBits.Length; i++)
                 {
-                    var mostCommonBit = bitTotalOp(totalPosBits, i);
-                    ret[i] = mostCommonBit;
+                    var newBit = bitTotalOp(totaledBits, i);
+                    ret[i] = newBit;
                 }
 
                 return ret;
@@ -648,6 +651,191 @@ namespace QuestionHandler
             var gammaRate = batteryLevel.getGammaRateInt();
             var epsilonRate = batteryLevel.getEpsilonRateInt();
             return (gammaRate * epsilonRate).ToString();
+        }
+    }
+    
+    public class Day3Q2Handler : QuestionHandler
+    {
+        private class LifeSupportRating
+        {
+            int[] input;
+            uint bitWidth;
+            int? oxygenGeneratorRating;
+            int? co2ScrubberRating;
+
+            public LifeSupportRating(int[] input, uint bitWidth)
+            {
+                if((input == null) || (input.Length == 0))
+                {
+                    string errorMsg;
+                    if(input == null)
+                    {
+                        errorMsg = "Input cannot be null";
+                    }
+                    else
+                    {
+                        errorMsg = "Input cannot be empty";
+                    }
+                    throw new BadInputException(errorMsg);
+                }
+
+                if(bitWidth < 1)
+                {
+                    throw new BadInputException("Bit width cannot be zero or negative");
+                }
+
+                this.input = input;
+                this.bitWidth = bitWidth;
+                this.oxygenGeneratorRating = null;
+                this.co2ScrubberRating = null;
+            }
+
+            private static bool intToBool(int x)
+            {
+                return x != 0 ? true : false;
+            }
+
+            private static int boolToInt(bool x)
+            {
+                return x ? 1 : 0;
+            }
+
+            private static int boolArrToInt(List<bool> toConvert, int prev = 0)
+            {
+                if((toConvert == null) || (toConvert.Count == 0))
+                {
+                    return prev;
+                }
+                else
+                {
+                    var curr = boolToInt(toConvert[toConvert.Count - 1]);
+                    toConvert.RemoveAt(toConvert.Count - 1);
+                    prev = (prev << 1) + curr;
+                    return boolArrToInt(toConvert, prev);
+                }
+            }
+
+            private int calcTotalPosBitsAt(List<int> currInput, int atPos)
+            {
+                var totalPosBits = 0;
+                foreach(var inValue in currInput)
+                {
+                    //extract that bit and add it to the total for that position
+                    //moveing from left to right, as i goes from bitWith-1 to 0
+                    totalPosBits += ((1 << atPos) & inValue) >> atPos;
+                }
+                return totalPosBits;
+            }
+
+            //TODO: rename
+            private int? siftBits(Func<int, List<int>, bool> bitTotalOp)
+            {
+                var matches = new List<int>(input);
+                int? ret = null;
+
+                for(int i = (int)bitWidth-1;  i >= 0; i--)
+                {
+                    var totalPosBits = calcTotalPosBitsAt(matches, i);
+                    var replacementBit = bitTotalOp(totalPosBits, matches);
+                    /* fill the list with matches from all the input values
+                     * else select from the values selected in the previous
+                     * run */
+                    var newMatches = new List<int>();
+                    foreach (var matchValue in matches)
+                    {
+                        //copy values that still match the criteria to a new list of matches
+                        if(intToBool(((1 << i) & matchValue) >> i) == replacementBit)
+                        {
+                            newMatches.Add(matchValue);
+                        }
+                    }
+                    matches = newMatches;
+
+                    if(matches.Count == 0 || matches.Count == 1)
+                        break;
+                }
+
+                if(matches.Count == 1)
+                {
+                    ret = matches[0];
+                }
+                return ret;
+            }
+
+
+            private void updateOxygenGeneratorRating()
+            {
+                this.oxygenGeneratorRating = siftBits((int totalPosBits, List<int> currVals) => ((float)totalPosBits >= ((float)currVals.Count) / 2.0));
+            }
+            private void updateCo2GeneratorRating()
+            {
+                this.co2ScrubberRating = siftBits((int totalPosBits, List<int> currVals) => ((float)totalPosBits < ((float)currVals.Count) / 2.0));
+            }
+
+            public int getOxygenRating()
+            {
+                if(this.oxygenGeneratorRating == null)
+                {
+                    updateOxygenGeneratorRating();
+                }
+
+                if(oxygenGeneratorRating.HasValue)
+                {
+                    return oxygenGeneratorRating.Value;
+                }
+                else
+                {
+                    throw new BadInputException("No valid oxygen value found");
+                }
+
+            }
+
+            public int getCo2ScrubberRating()
+            {
+                if(this.co2ScrubberRating == null)
+                {
+                    updateCo2GeneratorRating();
+                }
+
+                if(co2ScrubberRating.HasValue)
+                {
+                    return co2ScrubberRating.Value;
+                }
+                else
+                {
+                    throw new BadInputException("No valid co2 scrubber value found");
+                }
+            }
+        }
+
+        private int strBinToInt(string toConvert)
+        {
+            var inputChars = toConvert.ToCharArray();
+            int output = 0;
+            foreach(var ch in inputChars)
+            {
+                if((ch != '1') && (ch != '0'))
+                {
+                    throw new BadInputException("Can only take binary input, i.e '0's and or '1's in the string");
+                }
+                output = output << 1;
+                output += (ch == '0') ? 0 : 1;
+            }
+            return output;
+        }
+
+        public override string process(string[] toProcess)
+        {
+            var convertedInput = new int[toProcess.Length];
+            for(int i = 0; i < toProcess.Length; i++)
+            {
+                convertedInput[i] = strBinToInt(toProcess[i]);
+            }
+
+            var batteryLevel = new LifeSupportRating(convertedInput, (uint)toProcess[0].Length);
+            var oxygenRating = batteryLevel.getOxygenRating();
+            var co2ScrubberRating = batteryLevel.getCo2ScrubberRating();
+            return (oxygenRating * co2ScrubberRating).ToString();
         }
     }
 }
