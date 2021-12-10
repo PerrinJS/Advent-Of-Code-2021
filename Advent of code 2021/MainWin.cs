@@ -118,6 +118,10 @@ namespace Advent_of_code_2021
                     {
                         this.badInputUserNotification(badInput);
                     }
+                    catch (NotImplementedException notImpl)
+                    {
+                        this.notImplementedNotification(notImpl);
+                    }
                     catch (Exception error)
                     {
                         this.processingErrorNotification(error);
@@ -152,9 +156,16 @@ namespace Advent_of_code_2021
             MessageBox.Show("The question input was invalid:\n" + e.Message,
                 "Processing failed", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
+
+        private void notImplementedNotification(NotImplementedException e)
+        {
+            MessageBox.Show("Processing could not be conducted.\nThis solution has not been fully implemented.",
+                "Processing failed", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
         private void processingErrorNotification(Exception e)
         {
-            MessageBox.Show("Processing failed with the following message:\n" + e.Message + "\n" + e.GetType(),
+            MessageBox.Show("Processing failed with the following message:\n" + e.Message + "\n" + e.GetType() + "\n" + e.StackTrace,
                 "Processing failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
