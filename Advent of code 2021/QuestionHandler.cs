@@ -1,6 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
+using System.Collections;
+using System.Collections.Generic;
+using System.Text.RegularExpressions;
 
 namespace QuestionHandler
 {
@@ -39,8 +41,9 @@ namespace QuestionHandler
            new HandlerMapElement("Binary Diagnostic", 3, 1, delegate{return new Day3Q1Handler();}),
            new HandlerMapElement("Binary Diagnostic", 3, 2, delegate{return new Day3Q2Handler();}),
 
+           new HandlerMapElement("Giant Squid", 4, 1, delegate{return new Day4Q1Handler();}),
+           new HandlerMapElement("Giant Squid", 4, 2, delegate{return new Day4Q2Handler();}),
 
-            
         };
 
         //TODO: reimplement a mathmatical mapping for this
@@ -495,6 +498,7 @@ namespace QuestionHandler
         }
     }
 
+    //FIXME: For both of day 3's questions use a BitArray instead of int[]s'
     public class Day3Q1Handler : QuestionHandler
     {
         private class PowerConsumption
@@ -838,4 +842,877 @@ namespace QuestionHandler
             return (oxygenRating * co2ScrubberRating).ToString();
         }
     }
+
+    public class Day4Q1Handler : QuestionHandler
+    {
+        private class BingoGame
+        {
+            /* A typical Bingo game utilizes the numbers 1 through 75. The five
+             * columns of the card are labeled 'B', 'I', 'N', 'G', and 'O' from
+             * left to right. The center space is usually marked "Free" or
+             * "Free Space", and is considered automatically filled. The range
+             * of printed numbers that can appear on the card is normally
+             * restricted by column, with the 'B' column only containing numbers
+             * between 1 and 15 inclusive, the 'I' column containing only 16
+             * through 30, 'N' containing 31 through 45, 'G' containing 46
+             * through 60, and 'O' containing 61 through 75.
+             * Wikipedia: https://en.wikipedia.org/wiki/Bingo_(American_version)#Bingo_cards */
+            private int[,] selectedValuesTable;
+            private BitArray[] markedOffMap;
+            private Dictionary<int,int[]> valuePositions;
+            private bool bingo;
+
+            /// <summary>
+            /// The standard bingo game width and height (it's a square board)
+            /// </summary>
+            public const int BINGO_WNH = 5;
+
+            public BingoGame(int[,] selectedValues)
+            {
+                //a multidimentional array's length is equal to the product of all its dimens
+                if (selectedValues != null && selectedValues.Length/BINGO_WNH == BINGO_WNH)
+                {
+                    this.selectedValuesTable = selectedValues;
+                    //This is to act as a fast lookup for the table positions
+                    this.valuePositions = new Dictionary<int, int[]>();
+                    for(int i = 0; i < BINGO_WNH; i++)
+                    {
+                         for(int j = 0; j < BINGO_WNH; j++)
+                        {
+                            //The question don't follow the number rules
+                            this.valuePositions.Add(this.selectedValuesTable[i, j], new[] { i, j });
+                        }
+                    }
+                }
+                else
+                {
+                    //TODO: this is for if we add a setter
+                    /*if (selectedValues == null)
+                    {
+                        this.selectedValuesTable = selectedValues;
+                        this.valuePositions = null;
+                    }
+                    else*/
+                        throw new BadInputException($"Bingo Tables need to be {BINGO_WNH}x{BINGO_WNH}");
+                }
+
+                this.markedOffMap = new BitArray[BINGO_WNH];
+                for(int i = 0; i < this.markedOffMap.Length; i++)
+                {
+                    this.markedOffMap[i] = new BitArray(new[] { false, false, false, false, false });
+                }
+                //This is the "Free Space"
+                this.markedOffMap[2].And(new BitArray(new[] { false, false, true, false, false }));
+                this.bingo = false;
+            }
+
+            public bool hasBingo()
+            {
+                /*"Diagonals don't count"*/
+                if(!this.bingo)
+                {
+                    var found = false;
+                    var checkCol = new BitArray(new[] { true, true, true, true, true });
+                    //If we test a row and all are false then none of the collumns can be true
+                    foreach(var row in this.markedOffMap)
+                    {
+                        //Manually check for equality so we know if we need the check the collumns
+                        var tmpFalsePos = hasFalsePos(row);
+
+                        if (tmpFalsePos.Count == 0)
+                        {
+                            found = true;
+                            break;
+                        }
+                        else
+                        {
+                            //set all the collumns that have false values to false to indicate they are not to be searched
+                            for(int i = 0; i < tmpFalsePos.Count; i++)
+                                checkCol[tmpFalsePos[i]] = false;
+                        }
+
+                    }
+
+                    if(!found && !allFalse(checkCol))
+                    {
+                        var tmpFound = true;
+                        for(int i = 0; i < BINGO_WNH; i++)
+                        {
+                            BitArray currCol = this.getCol(i);
+                            var falsePos = hasFalsePos(currCol);
+                            if(falsePos.Count != 0)
+                            {
+                                tmpFound = false;
+                                break;
+                            }
+                        }
+                        if (tmpFound)
+                        {
+                            found = true;
+                        }
+                    }
+
+                    if (found)
+                    {
+                        bingo = true;
+                    }
+                }
+
+                return bingo;
+            }
+
+            public void markOff(int calledOutValue)
+            {
+                if(!bingo)
+                {
+                    int[] markOffPos;
+                    var hasVal = valuePositions.TryGetValue(calledOutValue, out markOffPos);
+                    if (hasVal)
+                    {
+                        //Make a mask for the selected position
+                        var tmpRow = new BitArray(new[] { false, false, false, false, false });
+                        tmpRow[markOffPos[1]] = true;
+                        //Set the selected field by oring the mask with the row it's in
+                        markedOffMap[markOffPos[0]].Or(tmpRow);
+                    }
+                }
+            }
+            public List<int> getUnmarked()
+            {
+                var unmarked = new List<int>();
+                Tuple<int, int> tmpUnmarkedPos = new Tuple<int, int>(0, 0);
+
+                foreach(var val in this.valuePositions.Keys)
+                {
+                    int[] valPos;
+                    this.valuePositions.TryGetValue(val, out valPos);
+
+                    if(!this.markedOffMap[valPos[0]][valPos[1]])
+                    {
+                        unmarked.Add(val);
+                    }
+                }
+
+                return unmarked;
+            }
+
+            private BitArray getCol(int colIdx)
+            {
+                Debug.Assert(colIdx < BINGO_WNH);
+                var selectedCollumn = new BitArray(new[] { false, false, false, false });
+                foreach(var row in this.markedOffMap)
+                {
+                    selectedCollumn[colIdx] = row[colIdx];
+                }
+                return selectedCollumn;
+            }
+
+            private static List<int> hasFalsePos(BitArray row)
+            {
+                var ret = new List<int>();
+                for(int i = 0; i < row.Length; i++)
+                {
+                    if(row[i] == false)
+                    {
+                        ret.Add(i);
+                    }
+                }
+                return ret;
+            }
+
+            private static bool allFalse(BitArray toCheck)
+            {
+                var ret = true;
+                foreach(bool bit in toCheck)
+                {
+                    //If true then thair not all false;
+                    if (bit)
+                    {
+                        ret = false;
+                        break;
+                    }
+                }
+                return ret;
+            }
+        }
+
+        private class BingoGameParser: IEnumerable<BingoGame>
+        {
+            enum NextLineType
+            {
+                ValidLine,
+                InvalidLine,
+                EndOfInput
+            }
+
+            uint toParsePos;
+            string[] toParse;
+
+            public BingoGameParser(string[] input)
+            {
+                this.toParsePos = 0;
+                this.toParse = input;
+                this.skipToFirstValid();
+            }
+
+            public IEnumerator<BingoGame> GetEnumerator()
+            {
+                BingoGame nextGame = null;
+                Func<BingoGame, bool> validGame = (BingoGame game) => game != null;
+                do
+                {
+                    nextGame = getNextGame();
+                    if(validGame(nextGame))
+                        yield return nextGame;
+                } while (validGame(nextGame));
+
+                yield break;
+            }
+
+            IEnumerator IEnumerable.GetEnumerator()
+            {
+                return this.GetEnumerator();
+            }
+
+            private bool endOfToParse()
+            {
+                //toParsePos should never be greater than toParseLength
+                Debug.Assert(toParsePos <= toParse.Length);
+                return toParsePos == toParse.Length;
+            }
+
+            private NextLineType moveToNextValidLine()
+            {
+                NextLineType? tmpRet = null;
+                Func<string, NextLineType?> validPos = (string toCheck) => {
+                    toCheck.Trim();
+                    NextLineType? lineType = null;
+                    //Check we only have numbers and spaces
+                    var isMatch = isValidGameLine(toCheck);
+                    if(isMatch)
+                    {
+                        lineType = NextLineType.ValidLine;
+                    }
+                    else if(!isMatch && toCheck != "")
+                    {
+                        lineType = NextLineType.InvalidLine;
+                    }
+
+                    return lineType;
+                };
+                
+                //Skip to the next line of note if we are alreay at a line of note do nothing
+                while(!endOfToParse() && (tmpRet = validPos(toParse[toParsePos])) == null)
+                    toParsePos++;
+
+                if (endOfToParse())
+                    tmpRet = NextLineType.EndOfInput;
+
+                Debug.Assert(tmpRet.HasValue);
+                return tmpRet.Value;
+            }
+
+            private BingoGame parseNextGame()
+            {
+                var parsedGameValues = new int[BingoGame.BINGO_WNH, BingoGame.BINGO_WNH];
+                for(int i = 0; i < BingoGame.BINGO_WNH; i++)
+                {
+                    if (endOfToParse())
+                        throw new BadInputException("This sould not be called unless at the start of a valid group of BingoGame lines");
+                    var nextInputLine = parseValuesLine(toParse[toParsePos]);
+                    for(int j = 0; j < BingoGame.BINGO_WNH; j++)
+                    {
+                        parsedGameValues[i, j] = nextInputLine[j];
+                    }
+                    toParsePos++;
+                }
+                return new BingoGame(parsedGameValues);
+            }
+
+            private BingoGame getNextGame()
+            {
+                BingoGame nextGame = null;
+
+                var nextLineType = moveToNextValidLine();
+                if (nextLineType != NextLineType.EndOfInput)
+                {
+                    nextGame = parseNextGame();
+                }
+                else if (nextLineType == NextLineType.InvalidLine)
+                    throw new BadInputException("All BingoGame lines should only contain numbers and spaces:\n" + toParse[toParsePos]);
+
+                return nextGame;
+            }
+
+            private static bool isValidGameLine(string toCheck)
+            {
+                return Regex.IsMatch(toCheck, @"^[0-9 ]+$");
+            }
+
+            private void skipToFirstValid()
+            {
+                bool looking = true;
+                while(looking && !endOfToParse())
+                {
+                    if (!isValidGameLine(this.toParse[toParsePos]))
+                        toParsePos++;
+                        looking = false;
+                }
+            }
+
+            private static int[] parseValuesLine(string toParse)
+            {
+                var parsedValues = new int[BingoGame.BINGO_WNH];
+                toParse.Trim();
+                string[] sepparatedStrings = toParse.Split();
+                int parsedValuesPos = 0;
+                int sepparatedStringsPos = 0;
+                while (sepparatedStringsPos < sepparatedStrings.Length && parsedValuesPos < parsedValues.Length)
+                {
+                    var stringPart = sepparatedStrings[sepparatedStringsPos];
+                    //They add spaces for number alignment
+                    if (stringPart != "")
+                    {
+                        try
+                        {
+                            parsedValues[parsedValuesPos] = int.Parse(stringPart);
+                        }
+                        catch (FormatException e)
+                        {
+                            throw new BadInputException("Bad BingoGame line", e);
+                        }
+                        parsedValuesPos++;
+                    }
+                    sepparatedStringsPos++;
+                }
+                return parsedValues;
+            }
+        }
+
+        private static List<int> parseGameInputValues(string inputValLine)
+        {
+            var convertedList = new List<int>();
+            inputValLine.Trim();
+            string[] values = inputValLine.Split(new[] { ',' });
+            try
+            {
+                foreach(var value in values)
+                {
+                    convertedList.Add(int.Parse(value));
+                }
+            }
+            catch(FormatException e)
+            {
+                throw new BadInputException("Input line should only contain comma separated ints", e);
+            }
+
+            return convertedList;
+        }
+
+        private static int recSum(int[] toSum, int currPos = 0, int currTotal = 0)
+        {
+            if(toSum.Length == currPos)
+            {
+                return currTotal;
+            }
+
+            //Should be tail call recursive complient
+            return recSum(toSum, currPos + 1, currTotal + toSum[currPos]);
+        }
+        
+        public override string process(string[] toProcess)
+        {
+            List<int> gameInputValues = parseGameInputValues(toProcess[0]);
+            Tuple<int, BingoGame> lastNumAndWinBoard = null;
+            List<BingoGame> bingoGames = new List<BingoGame>();
+
+            foreach(var bingoGame in new BingoGameParser(toProcess))
+            {
+                bingoGames.Add(bingoGame);
+            }
+            
+            foreach(var currVal in gameInputValues)
+            {
+                for(int j = 0; j < bingoGames.Count; j++)
+                {
+                    var currBoard = bingoGames[j];
+                    currBoard.markOff(currVal);
+                    if(currBoard.hasBingo())
+                    {
+                        lastNumAndWinBoard = new Tuple<int, BingoGame>(currVal, currBoard);
+                        break;
+                    }
+                }
+                if (lastNumAndWinBoard != null)
+                    break;
+            }
+
+            if (lastNumAndWinBoard == null)
+                throw new BadInputException("There is no winning board in the given input");
+            else
+            {
+                return (lastNumAndWinBoard.Item1 * recSum(lastNumAndWinBoard.Item2.getUnmarked().ToArray())).ToString();
+            }
+        }
+    }
+
+    public class Day4Q2Handler: QuestionHandler
+    {
+        private class BingoGame
+        {
+            /* A typical Bingo game utilizes the numbers 1 through 75. The five
+             * columns of the card are labeled 'B', 'I', 'N', 'G', and 'O' from
+             * left to right. The center space is usually marked "Free" or
+             * "Free Space", and is considered automatically filled. The range
+             * of printed numbers that can appear on the card is normally
+             * restricted by column, with the 'B' column only containing numbers
+             * between 1 and 15 inclusive, the 'I' column containing only 16
+             * through 30, 'N' containing 31 through 45, 'G' containing 46
+             * through 60, and 'O' containing 61 through 75.
+             * Wikipedia: https://en.wikipedia.org/wiki/Bingo_(American_version)#Bingo_cards */
+            private int[,] selectedValuesTable;
+            private BitArray[] markedOffMap;
+            private Dictionary<int, int[]> valuePositions;
+            private bool bingo;
+
+            /// <summary>
+            /// The standard bingo game width and height (it's a square board)
+            /// </summary>
+            public const int BINGO_WNH = 5;
+
+            public BingoGame(int[,] selectedValues)
+            {
+                //a multidimentional array's length is equal to the product of all its dimens
+                if (selectedValues != null && selectedValues.Length / BINGO_WNH == BINGO_WNH)
+                {
+                    this.selectedValuesTable = selectedValues;
+                    //This is to act as a fast lookup for the table positions
+                    this.valuePositions = new Dictionary<int, int[]>();
+                    for (int i = 0; i < BINGO_WNH; i++)
+                    {
+                        for (int j = 0; j < BINGO_WNH; j++)
+                        {
+                            //The question don't follow the number rules
+                            this.valuePositions.Add(this.selectedValuesTable[i, j], new[] { i, j });
+                        }
+                    }
+                }
+                else
+                {
+                    //TODO: this is for if we add a setter
+                    /*if (selectedValues == null)
+                    {
+                        this.selectedValuesTable = selectedValues;
+                        this.valuePositions = null;
+                    }
+                    else*/
+                    throw new BadInputException($"Bingo Tables need to be {BINGO_WNH}x{BINGO_WNH}");
+                }
+
+                this.markedOffMap = new BitArray[BINGO_WNH];
+                for (int i = 0; i < this.markedOffMap.Length; i++)
+                {
+                    this.markedOffMap[i] = new BitArray(new[] { false, false, false, false, false });
+                }
+                //This is the "Free Space"
+                this.markedOffMap[2].And(new BitArray(new[] { false, false, true, false, false }));
+                this.bingo = false;
+            }
+
+            public override string ToString()
+            {
+                string output = "";
+                for(int i = 0; i < BINGO_WNH; i++)
+                {
+                    var row = this.markedOffMap[i];
+                    for(int j = 0; j < BINGO_WNH; j++)
+                    {
+                        var value = row[j];
+                        output += "|";
+                        if(value)
+                        {
+                            output += "---";
+                        }
+                        else
+                        {
+                            output += this.selectedValuesTable[i, j].ToString("000");
+                        }
+                    }
+                    output += "|\n";
+                }
+                //Remove the extra new line
+                output.Trim();
+                return output;
+            }
+
+            public bool hasBingo()
+            {
+                if (!this.bingo)
+                {
+                    /*"Diagonals don't count"*/
+                    var found = false;
+                    var checkCol = new BitArray(new[] { true, true, true, true, true });
+                    //If we test a row and all are false then none of the collumns can be true
+                    foreach (var row in this.markedOffMap)
+                    {
+                        //Manually check for equality so we know if we need the check the collumns
+                        var tmpFalsePos = hasFalsePos(row);
+
+                        if (tmpFalsePos.Count == 0)
+                        {
+                            found = true;
+                            break;
+                        }
+                        else
+                        {
+                            //set all the collumns that have false values to false to indicate they are not to be searched
+                            for (int i = 0; i < tmpFalsePos.Count; i++)
+                                checkCol[tmpFalsePos[i]] = false;
+                        }
+
+                    }
+
+                    if (!found && !allFalse(checkCol))
+                    {
+                        for (int i = 0; i < BINGO_WNH; i++)
+                        {
+                            BitArray currCol = this.getCol(i);
+                            var falsePos = hasFalsePos(currCol);
+                            if (falsePos.Count == 0)
+                            {
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (found)
+                    {
+                        bingo = true;
+                    }
+                }
+
+                return bingo;
+            }
+
+            public void markOff(int calledOutValue)
+            {
+                if(!bingo)
+                {
+                    int[] markOffPos;
+                    var hasVal = valuePositions.TryGetValue(calledOutValue, out markOffPos);
+                    if (hasVal)
+                    {
+                        //Make a mask for the selected position
+                        var tmpRow = new BitArray(new[] { false, false, false, false, false });
+                        tmpRow[markOffPos[1]] = true;
+                        //Set the selected field by oring the mask with the row it's in
+                        markedOffMap[markOffPos[0]].Or(tmpRow);
+                    }
+                }
+            }
+            public List<int> getUnmarked()
+            {
+                var unmarked = new List<int>();
+                Tuple<int, int> tmpUnmarkedPos = new Tuple<int, int>(0, 0);
+
+                foreach (var val in this.valuePositions.Keys)
+                {
+                    int[] valPos;
+                    this.valuePositions.TryGetValue(val, out valPos);
+
+                    if (!this.markedOffMap[valPos[0]][valPos[1]])
+                    {
+                        unmarked.Add(val);
+                    }
+                }
+
+                return unmarked;
+            }
+
+            private BitArray getCol(int colIdx)
+            {
+                Debug.Assert(colIdx < BINGO_WNH);
+                var selectedCollumn = new BitArray(new[] { false, false, false, false, false });
+                //row i at colIdx gets mapped into col i of selected collumn
+                for(int i = 0; i < this.markedOffMap.Length; i++)
+                {
+                    var row = this.markedOffMap[i];
+                    selectedCollumn[i] = row[colIdx];
+                }
+                return selectedCollumn;
+            }
+
+            private static List<int> hasFalsePos(BitArray row)
+            {
+                var ret = new List<int>();
+                for (int i = 0; i < row.Length; i++)
+                {
+                    if (row[i] == false)
+                    {
+                        ret.Add(i);
+                    }
+                }
+                return ret;
+            }
+
+            private static bool allFalse(BitArray toCheck)
+            {
+                var ret = true;
+                foreach (bool bit in toCheck)
+                {
+                    //If true then thair not all false;
+                    if (bit)
+                    {
+                        ret = false;
+                        break;
+                    }
+                }
+                return ret;
+            }
+
+        }
+
+        private class BingoGameParser : IEnumerable<BingoGame>
+        {
+            enum NextLineType
+            {
+                ValidLine,
+                InvalidLine,
+                EndOfInput
+            }
+
+            uint toParsePos;
+            string[] toParse;
+
+            public BingoGameParser(string[] input)
+            {
+                this.toParsePos = 0;
+                this.toParse = input;
+                this.skipToFirstValid();
+            }
+
+            public IEnumerator<BingoGame> GetEnumerator()
+            {
+                BingoGame nextGame = null;
+                Func<BingoGame, bool> validGame = (BingoGame game) => game != null;
+                do
+                {
+                    nextGame = getNextGame();
+                    if (validGame(nextGame))
+                        yield return nextGame;
+                } while (validGame(nextGame));
+
+                yield break;
+            }
+
+            IEnumerator IEnumerable.GetEnumerator()
+            {
+                return this.GetEnumerator();
+            }
+
+            private bool endOfToParse()
+            {
+                //toParsePos should never be greater than toParseLength
+                Debug.Assert(toParsePos <= toParse.Length);
+                return toParsePos == toParse.Length;
+            }
+
+            private NextLineType moveToNextValidLine()
+            {
+                NextLineType? tmpRet = null;
+                Func<string, NextLineType?> validPos = (string toCheck) => {
+                    toCheck.Trim();
+                    NextLineType? lineType = null;
+                    //Check we only have numbers and spaces
+                    var isMatch = isValidGameLine(toCheck);
+                    if (isMatch)
+                    {
+                        lineType = NextLineType.ValidLine;
+                    }
+                    else if (!isMatch && toCheck != "")
+                    {
+                        lineType = NextLineType.InvalidLine;
+                    }
+
+                    return lineType;
+                };
+
+                //Skip to the next line of note if we are alreay at a line of note do nothing
+                while (!endOfToParse() && (tmpRet = validPos(toParse[toParsePos])) == null)
+                    toParsePos++;
+
+                if (endOfToParse())
+                    tmpRet = NextLineType.EndOfInput;
+
+                Debug.Assert(tmpRet.HasValue);
+                return tmpRet.Value;
+            }
+
+            private BingoGame parseNextGame()
+            {
+                var parsedGameValues = new int[BingoGame.BINGO_WNH, BingoGame.BINGO_WNH];
+                for (int i = 0; i < BingoGame.BINGO_WNH; i++)
+                {
+                    if (endOfToParse())
+                        throw new BadInputException("This sould not be called unless at the start of a valid group of BingoGame lines");
+                    var nextInputLine = parseValuesLine(toParse[toParsePos]);
+                    for (int j = 0; j < BingoGame.BINGO_WNH; j++)
+                    {
+                        parsedGameValues[i, j] = nextInputLine[j];
+                    }
+                    toParsePos++;
+                }
+                return new BingoGame(parsedGameValues);
+            }
+
+            private BingoGame getNextGame()
+            {
+                BingoGame nextGame = null;
+
+                var nextLineType = moveToNextValidLine();
+                if (nextLineType != NextLineType.EndOfInput)
+                {
+                    nextGame = parseNextGame();
+                }
+                else if (nextLineType == NextLineType.InvalidLine)
+                    throw new BadInputException("All BingoGame lines should only contain numbers and spaces:\n" + toParse[toParsePos]);
+
+                return nextGame;
+            }
+
+            private static bool isValidGameLine(string toCheck)
+            {
+                return Regex.IsMatch(toCheck, @"^[0-9 ]+$");
+            }
+
+            private void skipToFirstValid()
+            {
+                bool looking = true;
+                while (looking && !endOfToParse())
+                {
+                    if (!isValidGameLine(this.toParse[toParsePos]))
+                        toParsePos++;
+                    looking = false;
+                }
+            }
+
+            private static int[] parseValuesLine(string toParse)
+            {
+                var parsedValues = new int[BingoGame.BINGO_WNH];
+                toParse.Trim();
+                string[] sepparatedStrings = toParse.Split();
+                int parsedValuesPos = 0;
+                int sepparatedStringsPos = 0;
+                while (sepparatedStringsPos < sepparatedStrings.Length && parsedValuesPos < parsedValues.Length)
+                {
+                    var stringPart = sepparatedStrings[sepparatedStringsPos];
+                    //They add spaces for number alignment
+                    if (stringPart != "")
+                    {
+                        try
+                        {
+                            parsedValues[parsedValuesPos] = int.Parse(stringPart);
+                        }
+                        catch (FormatException e)
+                        {
+                            throw new BadInputException("Bad BingoGame line", e);
+                        }
+                        parsedValuesPos++;
+                    }
+                    sepparatedStringsPos++;
+                }
+                return parsedValues;
+            }
+        }
+
+        private static List<int> parseGameInputValues(string inputValLine)
+        {
+            var convertedList = new List<int>();
+            inputValLine.Trim();
+            string[] values = inputValLine.Split(new[] { ',' });
+            try
+            {
+                foreach (var value in values)
+                {
+                    convertedList.Add(int.Parse(value));
+                }
+            }
+            catch (FormatException e)
+            {
+                throw new BadInputException("Input line should only contain comma separated ints", e);
+            }
+
+            return convertedList;
+        }
+
+        private static int recSum(int[] toSum, int currPos = 0, int currTotal = 0)
+        {
+            if (toSum.Length == currPos)
+            {
+                return currTotal;
+            }
+
+            //Should be tail call recursive complient
+            return recSum(toSum, currPos + 1, currTotal + toSum[currPos]);
+        }
+
+        private static Tuple<int, int> findLastGameToWin(List<int> gameInputValues, List<BingoGame> bingoGames)
+        {
+            //keep track of how many games have been won
+            int winningValue = 0;
+            List<BingoGame> winOrder = new List<BingoGame>();
+            BingoGame winningGame = null;
+
+
+            foreach(var value in gameInputValues)
+            {
+                foreach(var game in bingoGames)
+                {
+                    game.markOff(value);
+                    if(game.hasBingo())
+                    {
+                        if(!winOrder.Contains(game))
+                        {
+                            winOrder.Add(game);
+                        }
+                    }
+
+                    if(winOrder.Count == bingoGames.Count)
+                    {
+                        winningGame = game;
+                        winningValue = value;
+                        break;
+                    }
+                }
+                if(winOrder.Count == bingoGames.Count)
+                    break;
+            }
+
+            return new Tuple<int, int>(winningValue, bingoGames.IndexOf(winningGame));
+        }
+
+        public override string process(string[] toProcess)
+        {
+            List<int> gameInputValues = parseGameInputValues(toProcess[0]);
+            //the number to win the game and the index of the game that won
+            Tuple<int, int> lastNumAndWinBoard = null;
+            List<BingoGame> bingoGames = new List<BingoGame>();
+
+            foreach (var bingoGame in new BingoGameParser(toProcess))
+            {
+                bingoGames.Add(bingoGame);
+            }
+
+            lastNumAndWinBoard = findLastGameToWin(gameInputValues, bingoGames);
+
+            if (lastNumAndWinBoard == null)
+                throw new BadInputException("There is no winning board in the given input");
+            else
+            {
+                return (lastNumAndWinBoard.Item1 * recSum(bingoGames[lastNumAndWinBoard.Item2].getUnmarked().ToArray())).ToString();
+            }
+        }
+    }
+
 }
