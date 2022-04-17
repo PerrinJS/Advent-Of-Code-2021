@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Diagnostics;
 using System.Collections;
 using System.Collections.Generic;
@@ -44,6 +45,12 @@ namespace QuestionHandler
            new HandlerMapElement("Giant Squid", 4, 1, delegate{return new Day4Q1Handler();}),
            new HandlerMapElement("Giant Squid", 4, 2, delegate{return new Day4Q2Handler();}),
 
+           new HandlerMapElement("Hydrothermal Venture", 5, 1, delegate{return new Day5Q1Handler();}),
+           new HandlerMapElement("Hydrothermal Venture", 5, 2, delegate{return new Day5Q2Handler();}),
+
+           new HandlerMapElement("Lanternfish", 6, 1, delegate{ return new Day6Q1Handler(); }),
+           //Literally the same
+           new HandlerMapElement("Lanternfish", 6, 2, delegate{ return new Day6Q1Handler(256); }),
         };
 
         //TODO: reimplement a mathmatical mapping for this
@@ -1715,4 +1722,581 @@ namespace QuestionHandler
         }
     }
 
+    public class Day5Q1Handler : QuestionHandler
+    {
+        private class VentLine
+        {
+            public Tuple<uint, uint> Start { get; }
+            public Tuple<uint, uint> End { get; }
+
+            public VentLine(Tuple<uint, uint> start, Tuple<uint, uint> end)
+            {
+                this.Start = start;
+                this.End = end;
+            }
+
+            public static class VentLineParser
+            {
+                const string VENT_STRING_LINE_FORMAT = "[0-9]+,[0-9]+ -> [0-9]+,[0-9]+";
+                public static VentLine parseLine(string toProcess)
+                {
+                    //Check if the string is a match
+                    if (Regex.IsMatch(toProcess, VENT_STRING_LINE_FORMAT))
+                    {
+                        int[] ventLineValues = new int[4];
+                        string[] ventStringParts = toProcess.Split(new[] { ',' });
+                        string[] centerDigits = ventStringParts[1].Split(new string[] {" -> "}, StringSplitOptions.None);
+
+                        ventLineValues[0] = int.Parse(ventStringParts[0]);
+                        ventLineValues[1] = int.Parse(centerDigits[0]);
+                        ventLineValues[2] = int.Parse(centerDigits[1]);
+                        ventLineValues[3] = int.Parse(ventStringParts[2]);
+
+                        return new VentLine(new Tuple<uint, uint>((uint)ventLineValues[0], (uint)ventLineValues[1]),
+                            new Tuple<uint, uint>((uint)ventLineValues[2], (uint)ventLineValues[3]));
+                    }
+                    else
+                        throw new BadInputException("The line " + toProcess + " does not match the guiven format " + VENT_STRING_LINE_FORMAT);
+                }
+                
+                public static List<VentLine> parseLines(string[] toProcess)
+                {
+                    var ret = new List<VentLine>();
+                    foreach(var line in toProcess)
+                    {
+                        if(!line.Equals(""))
+                            ret.Add(parseLine(line));
+                    }
+                    return ret;
+                }
+            }
+        }
+
+        private class VentMap
+        {
+            const uint MIN_MAP_WIDTH_HEIGHT = 10;
+
+            private List<VentLine> plotLines;
+
+            private int mapHeight, mapWidth;
+            private bool mapValid;
+            private uint[,] ventMap;
+
+            public VentMap(List<VentLine> ventLines = null)
+            {
+                if(ventLines != null)
+                {
+                    this.plotLines = ventLines;
+                }
+                else
+                {
+                    this.plotLines = new List<VentLine>();
+                }
+
+                this.mapHeight = 0;
+                this.mapWidth = 0;
+            }
+
+            public void addLine(VentLine toAdd)
+            {
+                this.plotLines.Add(toAdd);
+                invalidate();
+            }
+
+            public uint[,] getVentMap()
+            {
+                if (!mapValid)
+                {
+                    generateMap();
+                }
+
+                return this.ventMap;
+            }
+
+            private void plotLine(VentLine line)
+            {
+                /*We acording to the question we don't need to pay attention to diagonals
+                 *so we just check that either we line up vertically or hirizontally */
+                //the x-axies line up
+                var horizontalLine = line.Start.Item1 == line.End.Item1;
+                //the y-axies line up
+                var verticalLine = line.Start.Item2 == line.End.Item2;
+
+                //Loop through the axis in which the line lies and increment the points it lies upon
+                //TODO: order the loop rages smallest to largest (right now they just start from whichever number is in the start)
+                if(horizontalLine)
+                {
+                    var xPos = line.Start.Item1;
+                    var yPosStart = (int)Math.Min(line.Start.Item2, line.End.Item2);
+                    var yPosEnd = (int)Math.Max(line.End.Item2, line.Start.Item2)+1;
+                    //The Enumerable range signiture is (start, count)
+                    foreach (var yPos in Enumerable.Range(yPosStart, yPosEnd-yPosStart))
+                    {
+                        this.ventMap[xPos, yPos]++;
+                    }
+                } else if (verticalLine)
+                {
+                    var yPos = line.Start.Item2;
+                    var xPosStart = (int)Math.Min(line.Start.Item1, line.End.Item1);
+                    var xPosEnd = (int)Math.Max(line.End.Item1, line.Start.Item1)+1;
+                    foreach(var xPos in Enumerable.Range(xPosStart, xPosEnd-xPosStart))
+                    {
+                        this.ventMap[xPos, yPos]++;
+                    }
+                }
+            }
+
+            //This isn't the best way to do this but whatever
+            private void findMaxWidthHeight()
+            {
+                foreach(var line in this.plotLines)
+                {
+                    var maxHeightForThisLine = (int)Math.Max(line.End.Item2, line.Start.Item2);
+                    var maxWidthForThisLine = (int)Math.Max(line.End.Item1, line.Start.Item1);
+                    if(this.mapHeight < maxHeightForThisLine)
+                        this.mapHeight = maxHeightForThisLine+1;
+                    if (this.mapWidth < maxWidthForThisLine)
+                        this.mapWidth = maxWidthForThisLine+1;
+                }
+            }
+
+            private void generateMap()
+            {
+                this.findMaxWidthHeight();
+                this.ventMap = new uint[this.mapWidth, this.mapHeight];
+                foreach(var line in this.plotLines)
+                {
+                    this.plotLine(line);
+                }
+
+                mapValid = true;
+            }
+
+            private void invalidate()
+            {
+                mapValid = false;
+            }
+        }
+
+        private static uint findOverlappingPoints(uint[,] map)
+        {
+            uint ret = 0;
+            foreach(uint value in map)
+            {
+                if(value >= 2)
+                {
+                    ret++;
+                }
+            }
+            return ret;
+        }
+
+        public override string process(string[] toProcess)
+        {
+            var ventLines = VentLine.VentLineParser.parseLines(toProcess);
+            var ventMap = new VentMap(ventLines);
+
+            return findOverlappingPoints(ventMap.getVentMap()).ToString();
+        }
+    }
+
+    //TODO: This is just a framework
+    public class Day5Q2Handler : QuestionHandler
+    {
+        private class VentLine
+        {
+            public Tuple<uint, uint> Start { get; }
+            public Tuple<uint, uint> End { get; }
+
+            public VentLine(Tuple<uint, uint> start, Tuple<uint, uint> end)
+            {
+                this.Start = start;
+                this.End = end;
+            }
+
+            public static class VentLineParser
+            {
+                const string VENT_STRING_LINE_FORMAT = "[0-9]+,[0-9]+ -> [0-9]+,[0-9]+";
+                public static VentLine parseLine(string toProcess)
+                {
+                    //Check if the string is a match
+                    if (Regex.IsMatch(toProcess, VENT_STRING_LINE_FORMAT))
+                    {
+                        int[] ventLineValues = new int[4];
+                        string[] ventStringParts = toProcess.Split(new[] { ',' });
+                        string[] centerDigits = ventStringParts[1].Split(new string[] {" -> "}, StringSplitOptions.None);
+
+                        ventLineValues[0] = int.Parse(ventStringParts[0]);
+                        ventLineValues[1] = int.Parse(centerDigits[0]);
+                        ventLineValues[2] = int.Parse(centerDigits[1]);
+                        ventLineValues[3] = int.Parse(ventStringParts[2]);
+
+                        return new VentLine(new Tuple<uint, uint>((uint)ventLineValues[0], (uint)ventLineValues[1]),
+                            new Tuple<uint, uint>((uint)ventLineValues[2], (uint)ventLineValues[3]));
+                    }
+                    else
+                        throw new BadInputException("The line " + toProcess + " does not match the guiven format " + VENT_STRING_LINE_FORMAT);
+                }
+                
+                public static List<VentLine> parseLines(string[] toProcess)
+                {
+                    var ret = new List<VentLine>();
+                    foreach(var line in toProcess)
+                    {
+                        if(!line.Equals(""))
+                            ret.Add(parseLine(line));
+                    }
+                    return ret;
+                }
+            }
+        }
+
+        private class VentMap
+        {
+            const uint MIN_MAP_WIDTH_HEIGHT = 10;
+
+            private List<VentLine> plotLines;
+
+            private int mapHeight, mapWidth;
+            private bool mapValid;
+            private uint[,] ventMap;
+
+            public VentMap(List<VentLine> ventLines = null)
+            {
+                if(ventLines != null)
+                {
+                    this.plotLines = ventLines;
+                }
+                else
+                {
+                    this.plotLines = new List<VentLine>();
+                }
+
+                this.mapHeight = 0;
+                this.mapWidth = 0;
+            }
+
+            public void addLine(VentLine toAdd)
+            {
+                this.plotLines.Add(toAdd);
+                invalidate();
+            }
+
+            public uint[,] getVentMap()
+            {
+                if (!mapValid)
+                {
+                    generateMap();
+                }
+
+                return this.ventMap;
+            }
+
+            private void plotLine(VentLine line)
+            {
+                //TODO: Add the applicable code such that we can handle diagonalls.
+                /*//the x-axies line up
+                var horizontalLine = line.Start.Item1 == line.End.Item1;
+                //the y-axies line up
+                var verticalLine = line.Start.Item2 == line.End.Item2;
+
+                //Loop through the axis in which the line lies and increment the points it lies upon
+                //TODO: order the loop rages smallest to largest (right now they just start from whichever number is in the start)
+                if(horizontalLine)
+                {
+                    var xPos = line.Start.Item1;
+                    var yPosStart = (int)Math.Min(line.Start.Item2, line.End.Item2);
+                    var yPosEnd = (int)Math.Max(line.End.Item2, line.Start.Item2)+1;
+                    //The Enumerable range signiture is (start, count)
+                    foreach (var yPos in Enumerable.Range(yPosStart, yPosEnd-yPosStart))
+                    {
+                        this.ventMap[xPos, yPos]++;
+                    }
+                } else if (verticalLine)
+                {
+                    var yPos = line.Start.Item2;
+                    var xPosStart = (int)Math.Min(line.Start.Item1, line.End.Item1);
+                    var xPosEnd = (int)Math.Max(line.End.Item1, line.Start.Item1)+1;
+                    foreach(var xPos in Enumerable.Range(xPosStart, xPosEnd-xPosStart))
+                    {
+                        this.ventMap[xPos, yPos]++;
+                    }
+                }*/
+            }
+
+            //This isn't the best way to do this but whatever
+            private void findMaxWidthHeight()
+            {
+                foreach(var line in this.plotLines)
+                {
+                    var maxHeightForThisLine = (int)Math.Max(line.End.Item2, line.Start.Item2);
+                    var maxWidthForThisLine = (int)Math.Max(line.End.Item1, line.Start.Item1);
+                    if(this.mapHeight < maxHeightForThisLine)
+                        this.mapHeight = maxHeightForThisLine+1;
+                    if (this.mapWidth < maxWidthForThisLine)
+                        this.mapWidth = maxWidthForThisLine+1;
+                }
+            }
+
+            private void generateMap()
+            {
+                this.findMaxWidthHeight();
+                this.ventMap = new uint[this.mapWidth, this.mapHeight];
+                foreach(var line in this.plotLines)
+                {
+                    this.plotLine(line);
+                }
+
+                mapValid = true;
+            }
+
+            private void invalidate()
+            {
+                mapValid = false;
+            }
+        }
+
+        private static uint findOverlappingPoints(uint[,] map)
+        {
+            uint ret = 0;
+            foreach(uint value in map)
+            {
+                if(value >= 2)
+                {
+                    ret++;
+                }
+            }
+            return ret;
+        }
+
+        public override string process(string[] toProcess)
+        {
+            var ventLines = VentLine.VentLineParser.parseLines(toProcess);
+            var ventMap = new VentMap(ventLines);
+
+            return findOverlappingPoints(ventMap.getVentMap()).ToString();
+        }
+    }
+
+    public class Day6Q1Handler : QuestionHandler
+    {
+        private uint simulationDays;
+        public Day6Q1Handler(uint days = 80)
+        {
+            simulationDays = days;
+        }
+
+        private class LanturnFish
+        {
+            public ushort dayCounter { get; private set; }
+
+            public LanturnFish(ushort startValue = 8)
+            {
+                if (startValue < 9)
+                {
+                    dayCounter = startValue;
+                }
+                else
+                    throw new ArgumentOutOfRangeException("startValue needs to be between 0 and 8");
+            }
+
+            public LanturnFish generateNext()
+            {
+                if(dayCounter > 0) {
+                    dayCounter--;
+                    return null;
+                }
+
+                //"Each day, a 0 becomes a 6 and adds a new 8 to the end of the list"
+                dayCounter = 6;
+                return new LanturnFish();
+            }
+
+        }
+
+        private class LanturnFishSimulation
+        {
+            public uint days{ get; private set; }
+            public List<LanturnFish> currentFish { get; private set; }
+
+            public uint? totalFish;
+            public LanturnFishSimulation(LanturnFish[] startingFish, uint days)
+            {
+                currentFish = new List<LanturnFish>(startingFish);
+                this.days = days;
+                totalFish = null;
+            }
+
+            public uint getToalFish()
+            {
+                if(totalFish == null)
+                {
+                    for(int i = 0; i < days; i++)
+                    {
+                        var currLen = currentFish.Count;
+                        for(int j = 0; j < currLen; j++)
+                        {
+                            var thisFish = this.currentFish[j];
+                            var nextFish = thisFish.generateNext();
+                            if (nextFish != null)
+                            {
+                                this.currentFish.Add(nextFish);
+                            }
+                        }
+
+                    }
+                    totalFish = (uint)this.currentFish.Count;
+                }
+                return totalFish ?? (uint)0;
+            }
+        }
+
+        private int[] parseInputToInts(string[] input)
+        {
+            List<int> output = new List<int>();
+            foreach(var inputLine in input)
+            {
+                var trimmedInput = inputLine.Trim();
+                var splitInput = trimmedInput.Split(new string[] { "," }, StringSplitOptions.None);
+                foreach(var value in splitInput)
+                {
+                    output.Add(int.Parse(value));
+                }
+            }
+
+            return output.ToArray();
+        }
+
+        private LanturnFish[] buildFishFromStartValues(int[] startValues)
+        {
+            List<LanturnFish> ret = new List<LanturnFish>();
+            foreach(var value in startValues)
+            {
+                ret.Add(new LanturnFish((ushort)value));
+            }
+            return ret.ToArray();
+        }
+
+        public override string process(string[] toProcess)
+        {
+            var fishStartingValues = parseInputToInts(toProcess);
+            var startingFish = buildFishFromStartValues(fishStartingValues);
+            var fishGroathSimulation = new LanturnFishSimulation(startingFish, this.simulationDays);
+            var finalFishCount = fishGroathSimulation.getToalFish();
+            return finalFishCount.ToString();
+        }
+    }
+
+    /*TODO: Currently this is just a copy of Day6Q1 (clearly it cant be done with a naive approach)
+     *Come up with a population groath model for modeling the groath starting from each individual fish.
+     * Run that n times with the #days being (simulationdays + (8-startingdays)) add the final number of
+     * fish from all the simuations (n simulations, one for each fish)*/
+    public class Day6Q2Handler : QuestionHandler
+    {
+        private uint simulationDays;
+        public Day6Q2Handler(uint days = 256)
+        {
+            simulationDays = days;
+        }
+
+        private class LanturnFish
+        {
+            public ushort dayCounter { get; private set; }
+
+            public LanturnFish(ushort startValue = 8)
+            {
+                if (startValue < 9)
+                {
+                    dayCounter = startValue;
+                }
+                else
+                    throw new ArgumentOutOfRangeException("startValue needs to be between 0 and 8");
+            }
+
+            public LanturnFish generateNext()
+            {
+                if(dayCounter > 0) {
+                    dayCounter--;
+                    return null;
+                }
+
+                //"Each day, a 0 becomes a 6 and adds a new 8 to the end of the list"
+                dayCounter = 6;
+                return new LanturnFish();
+            }
+
+        }
+
+        private class LanturnFishSimulation
+        {
+            public uint days{ get; private set; }
+            public List<LanturnFish> currentFish { get; private set; }
+
+            public uint? totalFish;
+            public LanturnFishSimulation(LanturnFish[] startingFish, uint days)
+            {
+                currentFish = new List<LanturnFish>(startingFish);
+                this.days = days;
+                totalFish = null;
+            }
+
+            public uint getToalFish()
+            {
+                if(totalFish == null)
+                {
+                    for(int i = 0; i < days; i++)
+                    {
+                        var currLen = currentFish.Count;
+                        for(int j = 0; j < currLen; j++)
+                        {
+                            var thisFish = this.currentFish[j];
+                            var nextFish = thisFish.generateNext();
+                            if (nextFish != null)
+                            {
+                                this.currentFish.Add(nextFish);
+                            }
+                        }
+
+                    }
+                    totalFish = (uint)this.currentFish.Count;
+                }
+                return totalFish ?? (uint)0;
+            }
+        }
+
+        private int[] parseInputToInts(string[] input)
+        {
+            List<int> output = new List<int>();
+            foreach(var inputLine in input)
+            {
+                var trimmedInput = inputLine.Trim();
+                var splitInput = trimmedInput.Split(new string[] { "," }, StringSplitOptions.None);
+                foreach(var value in splitInput)
+                {
+                    output.Add(int.Parse(value));
+                }
+            }
+
+            return output.ToArray();
+        }
+
+        private LanturnFish[] buildFishFromStartValues(int[] startValues)
+        {
+            List<LanturnFish> ret = new List<LanturnFish>();
+            foreach(var value in startValues)
+            {
+                ret.Add(new LanturnFish((ushort)value));
+            }
+            return ret.ToArray();
+        }
+
+        public override string process(string[] toProcess)
+        {
+            var fishStartingValues = parseInputToInts(toProcess);
+            var startingFish = buildFishFromStartValues(fishStartingValues);
+            var fishGroathSimulation = new LanturnFishSimulation(startingFish, this.simulationDays);
+            var finalFishCount = fishGroathSimulation.getToalFish();
+            return finalFishCount.ToString();
+        }
+    }
 }

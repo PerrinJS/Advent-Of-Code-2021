@@ -7,3 +7,14 @@ C:\Users\sand49\Source\Repos\Advent of code 2021\Advent of code 2021\obj\Debug\A
 C:\Users\sand49\Source\Repos\Advent of code 2021\Advent of code 2021\obj\Debug\Advent of code 2021.csproj.CoreCompileInputs.cache
 C:\Users\sand49\Source\Repos\Advent of code 2021\Advent of code 2021\obj\Debug\Advent of code 2021.exe
 C:\Users\sand49\Source\Repos\Advent of code 2021\Advent of code 2021\obj\Debug\Advent of code 2021.pdb
+C:\Users\sand49\Source\Repos\Advent-Of-Code-2021\Advent of code 2021\obj\Debug\Advent of code 2021.csproj.AssemblyReference.cache
+C:\Users\sand49\Source\Repos\Advent-Of-Code-2021\Advent of code 2021\obj\Debug\Advent_of_code_2021.Aoc2021AboutBox.resources
+C:\Users\sand49\Source\Repos\Advent-Of-Code-2021\Advent of code 2021\obj\Debug\Advent_of_code_2021.MainWin.resources
+C:\Users\sand49\Source\Repos\Advent-Of-Code-2021\Advent of code 2021\obj\Debug\Advent_of_code_2021.Properties.Resources.resources
+C:\Users\sand49\Source\Repos\Advent-Of-Code-2021\Advent of code 2021\obj\Debug\Advent of code 2021.csproj.GenerateResource.cache
+C:\Users\sand49\Source\Repos\Advent-Of-Code-2021\Advent of code 2021\obj\Debug\Advent of code 2021.csproj.CoreCompileInputs.cache
+C:\Users\sand49\Source\Repos\Advent-Of-Code-2021\Advent of code 2021\bin\Debug\Aoc 2021 Attempt.exe.config
+C:\Users\sand49\Source\Repos\Advent-Of-Code-2021\Advent of code 2021\bin\Debug\Aoc 2021 Attempt.exe
+C:\Users\sand49\Source\Repos\Advent-Of-Code-2021\Advent of code 2021\bin\Debug\Aoc 2021 Attempt.pdb
+C:\Users\sand49\Source\Repos\Advent-Of-Code-2021\Advent of code 2021\obj\Debug\Aoc 2021 Attempt.exe
+C:\Users\sand49\Source\Repos\Advent-Of-Code-2021\Advent of code 2021\obj\Debug\Aoc 2021 Attempt.pdb
